@@ -23,7 +23,8 @@ from openfermion.transforms import jordan_wigner
 
 def verstraete_cirac_2d_square(operator, x_dimension, y_dimension,
                                add_auxiliary_hamiltonian=True,
-                               snake=False):
+                               snake=False,
+                               aux_ham_graph_type='chains'):
     """Apply the Verstraete-Cirac transform on a 2-d square lattice.
 
     Note that this transformation adds one auxiliary fermionic mode
@@ -41,10 +42,18 @@ def verstraete_cirac_2d_square(operator, x_dimension, y_dimension,
             ordered according to the 2-d "snake" ordering. If False,
             we assume they are in "lexicographic" order by row and column
             index. Default is False.
+        aux_ham_graph_type (string, optional) : Specificies what
+            interactions are present in the auxiliary Hamiltonian. 'chains'
+            corresponds to Fig. 2a of Verstraete and Cirac (2005), and
+            'doublets' corresponds to Fig. 2b. For 'chains', the number of
+            columns must be even. 
 
     Returns:
         transformed_operator: A QubitOperator.
     """
+
+    if aux_ham_graph_type not in ['chains','doublets']:
+        raise NotImplementedError('Unsupported auxiliary graph type.')
     if x_dimension % 2 != 0:
         raise NotImplementedError('Currently only even x_dimension '
                                   'is supported.')
@@ -114,7 +123,7 @@ def verstraete_cirac_2d_square(operator, x_dimension, y_dimension,
     # resulting energy shift
     if add_auxiliary_hamiltonian:
         # Construct the auxiliary Hamiltonian graph
-        aux_ham_graph = auxiliary_graph_2d_square(x_dimension, y_dimension)
+        aux_ham_graph = auxiliary_graph_2d_square(x_dimension, y_dimension, aux_ham_graph_type)
 
         # Construct the auxiliary Hamiltonian
         aux_ham = FermionOperator()
@@ -152,7 +161,8 @@ def stabilizer_local_2d_square(i, j, x_dimension, y_dimension):
     i_col, i_row = snake_index_to_coordinates(i, x_dimension, y_dimension)
     j_col, j_row = snake_index_to_coordinates(j, x_dimension, y_dimension)
     if not (abs(i_row - j_row) == 1 and i_col == j_col or
-            abs(i_col - j_col) == 1 and i_row == j_row):
+            abs(i_col - j_col) == 1 and i_row == j_row or
+            i_row == j_row and i_col == j_col):
         raise ValueError("Vertices i and j are not adjacent")
 
     # Get the JWT indices in the combined system
@@ -189,7 +199,7 @@ def stabilizer_local_2d_square(i, j, x_dimension, y_dimension):
     return stab
 
 
-def auxiliary_graph_2d_square(x_dimension, y_dimension):
+def auxiliary_graph_2d_square(x_dimension, y_dimension, aux_ham_graph_type):
     """Obtain the auxiliary graph for a 2-d grid.
 
     Currently this only works for even x_dimension.
@@ -197,28 +207,54 @@ def auxiliary_graph_2d_square(x_dimension, y_dimension):
     graph = networkx.DiGraph()
     graph.add_nodes_from(range(x_dimension * y_dimension))
 
-    for k in range(0, x_dimension, 2):
-        # Create the loop spanning columns k and k + 1
-        # Add top edge
-        graph.add_edge(k + 1, k)
-        # Add bottom edge
-        graph.add_edge(coordinates_to_snake_index(k, y_dimension - 1,
-                                                  x_dimension, y_dimension),
-                       coordinates_to_snake_index(k + 1, y_dimension - 1,
+    if aux_ham_graph_type is 'chains':
+        for k in range(0, x_dimension, 2):
+            # Create the loop spanning columns k and k + 1
+            # Add top edge
+            graph.add_edge(k + 1, k)
+            # Add bottom edge
+            graph.add_edge(coordinates_to_snake_index(k, y_dimension - 1,
+                                                      x_dimension, y_dimension),
+                           coordinates_to_snake_index(k + 1, y_dimension - 1,
                                                   x_dimension, y_dimension))
-        for l in range(y_dimension - 1):
-            # Add edges between rows l and l + 1
-            # Add left edge
-            graph.add_edge(
-                coordinates_to_snake_index(k, l, x_dimension, y_dimension),
-                coordinates_to_snake_index(k, l + 1,
+            for l in range(y_dimension - 1):
+                # Add edges between rows l and l + 1
+                # Add left edge
+                graph.add_edge(
+                    coordinates_to_snake_index(k, l, x_dimension, y_dimension),
+                    coordinates_to_snake_index(k, l + 1,
                                            x_dimension, y_dimension))
-            # Add right edge
-            graph.add_edge(
-                coordinates_to_snake_index(k + 1, l + 1,
-                                           x_dimension, y_dimension),
-                coordinates_to_snake_index(k + 1, l,
-                                           x_dimension, y_dimension))
+                # Add right edge
+                graph.add_edge(
+                    coordinates_to_snake_index(k + 1, l + 1,
+                                               x_dimension, y_dimension),
+                    coordinates_to_snake_index(k + 1, l,
+                                               x_dimension, y_dimension))
+    elif aux_ham_graph_type is 'doublets':
+        for k in range(x_dimension):
+            # Create the doublets in column k
+            for l in range(k % 2,y_dimension-1,2):
+                graph.add_edge(coordinates_to_snake_index(k, l, x_dimension, y_dimension),
+                               coordinates_to_snake_index(k, l + 1, x_dimension, y_dimension))
+                graph.add_edge(coordinates_to_snake_index(k, l + 1, x_dimension, y_dimension),
+                               coordinates_to_snake_index(k, l, x_dimension, y_dimension))
+            # Create the self loops in column k
+            if k % 2 == 1:
+                # The column is odd, so add a self-loop at the top
+                graph.add_edge(coordinates_to_snake_index(k, 0, x_dimension, y_dimension),
+                               coordinates_to_snake_index(k, 0, x_dimension, y_dimension))
+            if k % 2 == 1 and y_dimension % 2 == 0:
+                # The column is odd and the number of rows is even, so add a self-loop at the bottom
+                graph.add_edge(coordinates_to_snake_index(k, y_dimension - 1, x_dimension, y_dimension),
+                               coordinates_to_snake_index(k, y_dimension - 1, x_dimension, y_dimension))
+            if k % 2 == 0 and y_dimension % 2 == 1:
+                # The column is even and the number of rows is odd, so add a self-loop at the bottom
+                graph.add_edge(coordinates_to_snake_index(k, y_dimension - 1, x_dimension, y_dimension),
+                               coordinates_to_snake_index(k, y_dimension - 1, x_dimension, y_dimension))
+        print(x_dimension,y_dimension,graph.edges())
+
+    else:
+        raise NotImplementedError('Unsupported auxiliary graph type.')
 
     return graph
 

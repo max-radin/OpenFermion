@@ -99,7 +99,8 @@ def dual_basis_external_potential(grid, geometry, spinless):
     return operator
 
 
-def plane_wave_external_potential(grid, geometry, spinless, e_cutoff=None):
+def plane_wave_external_potential(grid, geometry, spinless, e_cutoff=None,
+                                  dualling=True):
     """Return the external potential operator in plane wave basis.
 
     Args:
@@ -122,11 +123,17 @@ def plane_wave_external_potential(grid, geometry, spinless, e_cutoff=None):
 
     for indices_p in grid.all_points_indices():
         for indices_q in grid.all_points_indices():
-            shift = grid.length // 2
-            grid_indices_p_q = [
-                (indices_p[i] - indices_q[i] + shift) % grid.length
-                for i in range(grid.dimensions)]
-            momenta_p_q = momentum_vector(grid_indices_p_q, grid)
+            if dualling:
+                shift = grid.length // 2
+                grid_indices_p_q = [
+                    (indices_p[i] - indices_q[i] + shift) % grid.length
+                    for i in range(grid.dimensions)]
+                momenta_p_q = momentum_vector(grid_indices_p_q, grid)
+            else:
+                grid_indices_p_q = [indices_p[i] - indices_q[i]
+                                    for i in range(grid.dimensions)]
+                momenta_p_q = 2. * numpy.pi / grid.scale * \
+                    numpy.array(grid_indices_p_q)
             momenta_p_q_squared = momenta_p_q.dot(momenta_p_q)
             if momenta_p_q_squared == 0:
                 continue
@@ -156,7 +163,8 @@ def plane_wave_external_potential(grid, geometry, spinless, e_cutoff=None):
 
 def plane_wave_hamiltonian(grid, geometry=None,
                            spinless=False, plane_wave=True,
-                           include_constant=False, e_cutoff=None):
+                           include_constant=False, e_cutoff=None,
+                           dualling=True):
     """Returns Hamiltonian as FermionOperator class.
 
     Args:
@@ -187,7 +195,7 @@ def plane_wave_hamiltonian(grid, geometry=None,
 
     if plane_wave:
         external_potential = plane_wave_external_potential(
-            grid, geometry, spinless, e_cutoff)
+            grid, geometry, spinless, e_cutoff, dualling)
     else:
         external_potential = dual_basis_external_potential(
             grid, geometry, spinless)

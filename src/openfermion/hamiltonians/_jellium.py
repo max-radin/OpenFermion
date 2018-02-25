@@ -113,6 +113,8 @@ def position_vector(position_indices, grid):
 
     # Compute position vector.
     adjusted_vector = numpy.array(position_indices, float) - grid.length // 2
+    if grid.length % 2 is 0:
+        adjusted_vector += 0.5
     return grid.scale * adjusted_vector / float(grid.length)
 
 
@@ -137,6 +139,8 @@ def momentum_vector(momentum_indices, grid):
 
     # Compute momentum vector.
     adjusted_vector = numpy.array(momentum_indices, float) - grid.length // 2
+    if grid.length % 2 is 0:
+        adjusted_vector += 0.5
     return 2. * numpy.pi * adjusted_vector / grid.scale
 
 

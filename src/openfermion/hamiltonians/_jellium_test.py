@@ -54,7 +54,7 @@ class JelliumTest(unittest.TestCase):
         grid = Grid(dimensions=1, length=4, scale=4.)
         test_output = [position_vector(i, grid)
                        for i in range(grid.length)]
-        correct_output = [-2, -1, 0, 1]
+        correct_output = [-1.5, -0.5, 0.5, 1.5]
         self.assertEqual(correct_output, test_output)
 
         grid = Grid(dimensions=1, length=11, scale=2. * numpy.pi)

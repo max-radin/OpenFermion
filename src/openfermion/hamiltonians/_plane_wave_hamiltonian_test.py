@@ -20,8 +20,8 @@ import numpy
 from openfermion.hamiltonians import jellium_model
 from openfermion.hamiltonians._plane_wave_hamiltonian import *
 from openfermion.ops import normal_ordered
-from openfermion.transforms import jordan_wigner
-from openfermion.utils import eigenspectrum, Grid
+from openfermion.transforms import jordan_wigner, get_sparse_operator
+from openfermion.utils import eigenspectrum, Grid, is_hermitian
 
 
 class PlaneWaveHamiltonianTest(unittest.TestCase):
@@ -156,3 +156,10 @@ class PlaneWaveHamiltonianTest(unittest.TestCase):
 
         max_diff = numpy.amax(numpy.absolute(spectrum_1 - spectrum_2))
         self.assertGreater(max_diff, 0.)
+
+    def test_plane_wave_external_potential(self):
+        grid = Grid(1, 4, 4.0)
+        geometry = [('H', (0.1,))]
+        H = plane_wave_external_potential(grid, geometry, True)
+        sparse = get_sparse_operator(H)
+        self.assertTrue(is_hermitian(sparse))
